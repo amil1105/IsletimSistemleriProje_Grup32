@@ -1,0 +1,1 @@
+# IsletimSistemleriProje_Grup32
