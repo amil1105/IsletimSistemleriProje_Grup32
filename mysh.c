@@ -134,3 +134,77 @@ void add_bg_process(pid_t pid) {
     new_node->next = bg_head;
     bg_head = new_node;
 }
+// Arka Plan Süreci Çıkarma
+void remove_bg_process(pid_t pid) {
+    bg_process *current = bg_head;
+    bg_process *prev = NULL;
+    while (current != NULL) {
+        if (current->pid == pid) {
+            if (prev == NULL) {
+                bg_head = current->next;
+            }
+            else {
+                prev->next = current->next;
+            }
+            free(current);
+            return;
+        }
+        prev = current;
+        current = current->next;
+    }
+}
+
+// Tüm Arka Plan Süreçlerini Bekleme
+void wait_for_bg_processes() {
+    bg_process *current = bg_head;
+    while (current != NULL) {
+        waitpid(current->pid, NULL, 0);
+        printf("[%d] retval: 0\n", current->pid);
+        current = current->next;
+    }
+}
+
+// Sinyal Ayarları
+void setup_signal_handlers() {
+    struct sigaction sa_chld, sa_int;
+
+    // SIGCHLD Handler
+    sa_chld.sa_handler = sigchld_handler;
+    sigemptyset(&sa_chld.sa_mask);
+    sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    if (sigaction(SIGCHLD, &sa_chld, NULL) == -1) {
+        perror("sigaction SIGCHLD");
+        exit(EXIT_FAILURE);
+    }
+
+    // SIGINT Handler
+    sa_int.sa_handler = sigint_handler;
+    sigemptyset(&sa_int.sa_mask);
+    sa_int.sa_flags = SA_RESTART;
+    if (sigaction(SIGINT, &sa_int, NULL) == -1) {
+        perror("sigaction SIGINT");
+        exit(EXIT_FAILURE);
+    }
+}
+int main() {
+    char line[MAX_LINE];
+    char *cmd_sequence[MAX_CMDS];
+    int num_sequences;
+    pid_t pid;
+    int status;
+
+    // PATH'i güncelleme: mevcut PATH + ":." ekle
+    char *path = getenv("PATH");
+    if (path == NULL) {
+        fprintf(stderr, "PATH ortam değişkeni bulunamadı.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!is_dot_in_path(path)) {
+        char new_path[MAX_LINE];
+        snprintf(new_path, sizeof(new_path), ".:%s", path); // '.' ekleyerek PATH'in başına ekliyoruz
+        if (setenv("PATH", new_path, 1) != 0) {
+            perror("setenv failed");
+            exit(EXIT_FAILURE);
+        }
+    }
