@@ -208,3 +208,185 @@ int main() {
             exit(EXIT_FAILURE);
         }
     }
+
+
+    // Sinyal işleyicilerini ayarlayın
+    setup_signal_handlers();
+
+    while (1) {
+        // Prompt
+        printf("> ");
+        fflush(stdout);
+
+        // Kullanıcıdan komut al
+        if (!fgets(line, MAX_LINE, stdin)) {
+            break; // Ctrl+D ile çıkış
+        }
+
+        // Yeni satır karakterini kaldır
+        line[strcspn(line, "\n")] = '\0';
+
+        // Boş girişleri atla
+        if (strlen(line) == 0) {
+            continue;
+        }
+
+        // Komutları noktalı virgüle göre böl
+        char *seq = strtok(line, ";");
+        num_sequences = 0;
+        while (seq != NULL && num_sequences < MAX_CMDS) {
+            cmd_sequence[num_sequences++] = seq;
+            seq = strtok(NULL, ";");
+        }
+
+        for (int i = 0; i < num_sequences; i++) {
+            // Her komut dizisini borulara göre böl
+            command cmds[MAX_PIPE_CMDS];
+            int num_cmds = 0;
+            char *pipe_cmd = strtok(cmd_sequence[i], "|");
+            while (pipe_cmd != NULL && num_cmds < MAX_PIPE_CMDS) {
+                parse_command(pipe_cmd, &cmds[num_cmds]);
+                num_cmds++;
+                pipe_cmd = strtok(NULL, "|");
+            }
+
+            // Yerleşik Komut: quit
+            if (num_cmds > 0 && strcmp(cmds[0].args[0], "quit") == 0) {
+                // Eğer arka planda süreçler varsa bekle
+                if (bg_head != NULL) {
+                    wait_for_bg_processes();
+                }
+                exit(0);
+            }
+
+            // Yerleşik Komut: cd
+            if (num_cmds > 0 && strcmp(cmds[0].args[0], "cd") == 0) {
+                if (cmds[0].args[1] != NULL) {
+                    if (chdir(cmds[0].args[1]) != 0) {
+                        perror("cd failed");
+                    }
+                }
+                else {
+                    fprintf(stderr, "cd: expected argument\n");
+                }
+                continue;
+            }
+
+            int pipe_fds[2];
+            int prev_fd = -1;
+            pid_t child_pids[MAX_PIPE_CMDS];
+            int child_count = 0;
+
+            for (int j = 0; j < num_cmds; j++) {
+                // Son komut değilse pipe oluştur
+                if (j < num_cmds - 1) {
+                    if (pipe(pipe_fds) < 0) {
+                        perror("pipe failed");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+
+                pid = fork();
+                if (pid < 0) {
+                    perror("fork failed");
+                    exit(EXIT_FAILURE);
+                }
+                else if (pid == 0) {
+                    // Child process
+
+                    // SIGINT sinyalini varsayılan yap
+                    signal(SIGINT, SIG_DFL);
+
+                    // Önceki pipe'dan gelen veriyi oku
+                    if (prev_fd != -1) {
+                        if (dup2(prev_fd, STDIN_FILENO) == -1) {
+                            perror("dup2 failed");
+                            exit(EXIT_FAILURE);
+                        }
+                        close(prev_fd);
+                    }
+
+                    // Sonraki pipe'a yaz
+                    if (j < num_cmds - 1) {
+                        if (dup2(pipe_fds[1], STDOUT_FILENO) == -1) {
+                            perror("dup2 failed");
+                            exit(EXIT_FAILURE);
+                        }
+                        close(pipe_fds[0]);
+                        close(pipe_fds[1]);
+                    }
+
+                    // I/O yönlendirmesini yap
+                    if (cmds[j].input) {
+                        int fd_in = open(cmds[j].input, O_RDONLY);
+                        if (fd_in < 0) {
+                            perror("Giriş dosyası bulunamadı");
+                            exit(EXIT_FAILURE);
+                        }
+                        if (dup2(fd_in, STDIN_FILENO) == -1) {
+                            perror("dup2 failed");
+                            exit(EXIT_FAILURE);
+                        }
+                        close(fd_in);
+                    }
+                    if (cmds[j].output) {
+                        int fd_out;
+                        if (cmds[j].append) {
+                            fd_out = open(cmds[j].output, O_WRONLY | O_CREAT | O_APPEND, 0644);
+                        }
+                        else {
+                            fd_out = open(cmds[j].output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                        }
+                        if (fd_out < 0) {
+                            perror("Çıkış dosyası açılamadı");
+                            exit(EXIT_FAILURE);
+                        }
+                        if (dup2(fd_out, STDOUT_FILENO) == -1) {
+                            perror("dup2 failed");
+                            exit(EXIT_FAILURE);
+                        }
+                        close(fd_out);
+                    }
+
+                    // Komutu çalıştır
+                    if (execvp(cmds[j].args[0], cmds[j].args) == -1) {
+                        perror("exec failed");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                else {
+                    // Parent process
+
+                    child_pids[child_count++] = pid;
+
+                    // Önceki pipe'ı kapat
+                    if (prev_fd != -1) {
+                        close(prev_fd);
+                    }
+
+                    // Sonraki komut için okunacak pipe'ı sakla
+                    if (j < num_cmds - 1) {
+                        close(pipe_fds[1]); // Close write end in parent
+                        prev_fd = pipe_fds[0]; // Save read end for next command
+                    }
+
+                    // Arka plan işlemi ise ekle
+                    if (cmds[j].background) {
+                        add_bg_process(pid);
+                        printf("[%d] running in background\n", pid);
+                    }
+                }
+            }
+
+            // Tüm çocuk süreçlerini bekle
+            for (int k = 0; k < child_count; k++) {
+                if (!cmds[k].background) {
+                    waitpid(child_pids[k], &status, 0);
+                }
+            }
+        }
+
+        // Bellek sızıntılarını önlemek için süreçler tamamlandığında kaldırılır
+        // Ancak burada sigchld_handler zaten kaldırıyor
+    }
+}
