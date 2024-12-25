@@ -19,7 +19,7 @@ int main() {
 
     int number;
 
-    // Standart girdiden bir tam sayı oku
+    // Standart girdiden bir tam sayı okunur
     if (scanf("%d", &number) != 1) {
         fprintf(stderr, "Hata: Bir tam sayı girmelisiniz.\n");
         return 1;
