@@ -2,6 +2,7 @@
 # Erkin Erdoğan B241210385
 # Kianoush Seddighpour G221210571
 # Manar AL SAYED ALI G221210558
+# Abdulkadir NASIR B221210585
 
 # Makefile
 

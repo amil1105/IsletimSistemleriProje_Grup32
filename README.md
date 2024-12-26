@@ -1,1 +1,1 @@
-# IsletimSistemleriProje_Grup32
+﻿# IsletimSistemleriProje_Grup32z

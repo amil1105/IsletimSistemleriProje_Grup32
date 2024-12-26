@@ -2,6 +2,7 @@
 //Erkin Erdoğan B241210385
 //Kianoush Seddighpour G221210571
 //Manar AL SAYED ALI G221210558
+//Abdulkadir NASIR B221210585
 
 // mysh.c
 #include <stdio.h>
@@ -19,9 +20,9 @@
 #define MAX_PIPE_CMDS 10
 
 typedef struct command {
-    char *args[MAX_ARGS];
-    char *input;
-    char *output;
+    char* args[MAX_ARGS];
+    char* input;
+    char* output;
     int append;
     int background;
 } command;
@@ -29,13 +30,13 @@ typedef struct command {
 // Liste arka plan süreçleri için
 typedef struct bg_process {
     pid_t pid;
-    struct bg_process *next;
+    struct bg_process* next;
 } bg_process;
 
-bg_process *bg_head = NULL;
+bg_process* bg_head = NULL;
 
 // Fonksiyon Prototipleri
-void parse_command(char *line, command *cmd);
+void parse_command(char* line, command* cmd);
 void sigchld_handler(int sig);
 void sigint_handler(int sig);
 void add_bg_process(pid_t pid);
@@ -44,10 +45,10 @@ void wait_for_bg_processes();
 void setup_signal_handlers();
 
 // PATH içinde '.' olup olmadığını kontrol eden fonksiyon
-int is_dot_in_path(const char *path) {
-    char *path_dup = strdup(path);
+int is_dot_in_path(const char* path) {
+    char* path_dup = strdup(path);
     if (!path_dup) return 0;
-    char *token = strtok(path_dup, ":");
+    char* token = strtok(path_dup, ":");
     while (token != NULL) {
         if (strcmp(token, ".") == 0) {
             free(path_dup);
@@ -60,8 +61,8 @@ int is_dot_in_path(const char *path) {
 }
 
 // Komut Ayrıştırma Fonksiyonu
-void parse_command(char *line, command *cmd) {
-    char *token;
+void parse_command(char* line, command* cmd) {
+    char* token;
     int arg_index = 0;
     cmd->input = NULL;
     cmd->output = NULL;
@@ -125,7 +126,7 @@ void sigint_handler(int sig) {
 
 // Arka Plan Süreci Ekleme
 void add_bg_process(pid_t pid) {
-    bg_process *new_node = malloc(sizeof(bg_process));
+    bg_process* new_node = malloc(sizeof(bg_process));
     if (!new_node) {
         perror("malloc failed");
         exit(EXIT_FAILURE);
@@ -134,10 +135,11 @@ void add_bg_process(pid_t pid) {
     new_node->next = bg_head;
     bg_head = new_node;
 }
+
 // Arka Plan Süreci Çıkarma
 void remove_bg_process(pid_t pid) {
-    bg_process *current = bg_head;
-    bg_process *prev = NULL;
+    bg_process* current = bg_head;
+    bg_process* prev = NULL;
     while (current != NULL) {
         if (current->pid == pid) {
             if (prev == NULL) {
@@ -156,7 +158,7 @@ void remove_bg_process(pid_t pid) {
 
 // Tüm Arka Plan Süreçlerini Bekleme
 void wait_for_bg_processes() {
-    bg_process *current = bg_head;
+    bg_process* current = bg_head;
     while (current != NULL) {
         waitpid(current->pid, NULL, 0);
         printf("[%d] retval: 0\n", current->pid);
@@ -186,15 +188,16 @@ void setup_signal_handlers() {
         exit(EXIT_FAILURE);
     }
 }
+
 int main() {
     char line[MAX_LINE];
-    char *cmd_sequence[MAX_CMDS];
+    char* cmd_sequence[MAX_CMDS];
     int num_sequences;
     pid_t pid;
     int status;
 
     // PATH'i güncelleme: mevcut PATH + ":." ekle
-    char *path = getenv("PATH");
+    char* path = getenv("PATH");
     if (path == NULL) {
         fprintf(stderr, "PATH ortam değişkeni bulunamadı.\n");
         exit(EXIT_FAILURE);
@@ -232,7 +235,7 @@ int main() {
         }
 
         // Komutları noktalı virgüle göre böl
-        char *seq = strtok(line, ";");
+        char* seq = strtok(line, ";");
         num_sequences = 0;
         while (seq != NULL && num_sequences < MAX_CMDS) {
             cmd_sequence[num_sequences++] = seq;
@@ -243,7 +246,7 @@ int main() {
             // Her komut dizisini borulara göre böl
             command cmds[MAX_PIPE_CMDS];
             int num_cmds = 0;
-            char *pipe_cmd = strtok(cmd_sequence[i], "|");
+            char* pipe_cmd = strtok(cmd_sequence[i], "|");
             while (pipe_cmd != NULL && num_cmds < MAX_PIPE_CMDS) {
                 parse_command(pipe_cmd, &cmds[num_cmds]);
                 num_cmds++;

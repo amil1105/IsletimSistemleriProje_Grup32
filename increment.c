@@ -2,6 +2,7 @@
 //Erkin Erdoğan B241210385
 //Kianoush Seddighpour G221210571
 //Manar AL SAYED ALI G221210558
+//Abdulkadir NASIR B221210585
 
 // increment.c
 #include <stdio.h>
@@ -19,7 +20,7 @@ int main() {
 
     int number;
 
-    // Standart girdiden bir tam sayı okunur
+    // Standart girdiden bir tam sayı oku
     if (scanf("%d", &number) != 1) {
         fprintf(stderr, "Hata: Bir tam sayı girmelisiniz.\n");
         return 1;
