@@ -9,6 +9,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g
 TARGETS = mysh increment
 
+
 all: $(TARGETS)
 
 mysh: mysh.c
